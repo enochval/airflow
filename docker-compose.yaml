@@ -1,0 +1,96 @@
+version: "3.8"
+services:
+  app:
+    container_name: app
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    env_file:
+      - .env
+    ports:
+      - 8000:80
+    tty: true
+    working_dir: /var/www/
+    volumes:
+      - ./:/var/www
+#      - ./public:/var/www/public
+    depends_on:
+      - db
+      - redis
+    networks:
+      - app_network
+
+  queue:
+    container_name: queue
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    environment:
+      CONTAINER_ROLE: queue
+    env_file:
+      - .env
+    depends_on:
+      - app
+    networks:
+      - app_network
+
+  scheduler:
+    container_name: scheduler
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    environment:
+      CONTAINER_ROLE: scheduler
+    env_file:
+      - .env
+    depends_on:
+      - app
+    networks:
+      - app_network
+
+  db:
+    container_name: db
+    platform: linux/amd64
+    image: mysql:8.0.20
+    restart: always
+    volumes:
+      - ./storage/db-data:/var/lib/mysql
+    ports:
+      - 3308:3306
+    environment:
+      MYSQL_DATABASE: breeze
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root
+    networks:
+      - app_network
+
+  redis:
+    container_name: redis
+    image: redis:latest
+    ports:
+      - 6379:6379
+    volumes:
+      - redis:/data
+    networks:
+      - app_network
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: myapp-mailhog
+    ports:
+      - 8003:1025 # the mail server IMAP port that the application sends emails to
+      - 8100:8025 # http port to access the dashboard
+    networks:
+      - app_network
+
+volumes:
+  redis:
+    driver: local
+
+networks:
+  app_network:
+    driver: bridge
